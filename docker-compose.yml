@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  temporal:
+    image: temporalio/auto-setup:latest
+    ports:
+      - "7233:7233"
+    environment:
+      - DB=sqlite
+
+  mongo:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+
+  api-gateway:
+    build: ./services/api-gateway
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_SERVER=temporal:7233
+    ports:
+      - "8000:8000"
+
+  temporal-worker:
+    build: ./services/temporal-worker
+    depends_on:
+      - temporal
+      - mongo
+    environment:
+      - TEMPORAL_SERVER=temporal:7233
+
+  scanner-service:
+    build: ./services/scanner-service
+    depends_on:
+      - temporal
+      - mongo
+    environment:
+      - TEMPORAL_SERVER=temporal:7233

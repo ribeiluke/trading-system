@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+temporalio
+pydantic
+httpx
