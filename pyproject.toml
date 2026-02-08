@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "trading-system"
+version = "0.1.0"
+description = "Temporal based trading platform scaffold"
+authors = ["you"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "*"
+uvicorn = "*"
+temporalio = "*"
+pydantic = "*"
+httpx = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
