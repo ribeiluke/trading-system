@@ -1,39 +1,126 @@
-version: "3.9"
-
 services:
-  temporal:
-    image: temporalio/auto-setup:latest
+  postgresql:
+    container_name: temporal-postgresql
+    image: postgres:16
+    networks:
+      - temporal-network
     ports:
-      - "7233:7233"
+      - ${POSTGRES_PORT}:5432
     environment:
-      - DB=sqlite
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - /var/lib/postgresql/data
 
-  mongo:
-    image: mongo:6
+  temporal:
+    container_name: temporal
+    image: temporalio/auto-setup:1.29.1
+    depends_on:
+      - postgresql
+    networks:
+      - temporal-network
     ports:
-      - "27017:27017"
+      - ${TEMPORAL_PORT}:7233
+    environment:
+      - DB=${TEMPORAL_DB}
+      - DB_PORT=${DB_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD}
+      - POSTGRES_SEEDS=${POSTGRES_SEEDS}
+      - TEMPORAL_ADDRESS=${TEMPORAL_ADDRESS}
+      - TEMPORAL_CLI_ADDRESS=${TEMPORAL_CLI_ADDRESS}
+
+  temporal-admin-tools:
+    container_name: temporal-admin-tools
+    image: temporalio/admin-tools:1.29.1-tctl-1.18.4-cli-1.5.0
+    depends_on:
+      - temporal
+    networks:
+      - temporal-network
+    environment:
+      - TEMPORAL_ADDRESS=${TEMPORAL_ADDRESS}
+      - TEMPORAL_CLI_ADDRESS=${TEMPORAL_CLI_ADDRESS}
+    stdin_open: true
+    tty: true
+
+  temporal-ui:
+    container_name: temporal-ui
+    image: temporalio/ui:2.34.0
+    depends_on:
+      - temporal
+    networks:
+      - temporal-network
+    ports:
+      - ${TEMPORAL_UI_PORT}:8080
+    environment:
+      - TEMPORAL_ADDRESS=${TEMPORAL_ADDRESS}
+      - TEMPORAL_CORS_ORIGINS=${TEMPORAL_CORS_ORIGINS}
 
   api-gateway:
-    build: ./services/api-gateway
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
     depends_on:
       - temporal
-    environment:
-      - TEMPORAL_SERVER=temporal:7233
+    env_file:
+      - .env
+    networks:
+      - temporal-network
     ports:
-      - "8000:8000"
-
-  temporal-worker:
-    build: ./services/temporal-worker
-    depends_on:
-      - temporal
-      - mongo
+      - "${API_GATEWAY_PORT}:8000"
+      - "${API_GATEWAY_DEBUG_PORT}:5678"
     environment:
-      - TEMPORAL_SERVER=temporal:7233
+      - TEMPORAL_SERVER=${TEMPORAL_ADDRESS}
+      - PYDEVD_DISABLE_FILE_VALIDATION=1
 
   scanner-service:
-    build: ./services/scanner-service
+    build:
+      context: .
+      dockerfile: services/scanner-service/Dockerfile
     depends_on:
       - temporal
-      - mongo
+    env_file:
+      - .env
+    networks:
+      - temporal-network
+    ports:
+      - "${SCANNER_DEBUG_PORT}:5678"
     environment:
-      - TEMPORAL_SERVER=temporal:7233
+      - TEMPORAL_SERVER=${TEMPORAL_ADDRESS}
+      - PYDEVD_DISABLE_FILE_VALIDATION=1
+
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: services/telegram/Dockerfile
+    depends_on:
+      - temporal
+    env_file:
+      - .env
+    networks:
+      - temporal-network
+    environment:
+      - TEMPORAL_SERVER=${TEMPORAL_ADDRESS}
+
+  temporal-worker:
+    build:
+      context: .
+      dockerfile: services/temporal-worker/Dockerfile
+    depends_on:
+      - temporal
+      - telegram-bot
+    env_file:
+      - .env
+    networks:
+      - temporal-network
+    ports:
+      - "${WORKER_DEBUG_PORT}:5678"
+    environment:
+      - TEMPORAL_SERVER=${TEMPORAL_ADDRESS}
+      - PYDEVD_DISABLE_FILE_VALIDATION=1
+
+networks:
+  temporal-network:
+    driver: bridge
+    name: temporal-network
+

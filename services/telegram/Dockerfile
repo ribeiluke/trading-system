@@ -28,7 +28,8 @@ COPY pyproject.toml poetry.lock ./
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --no-root
 
-COPY ./services/api-gateway/app ./app
+COPY ./services/telegram/app ./app
 COPY ./shared ./shared
 
-CMD ["python", "-m", "debugpy", "--listen", "0.0.0.0:5680", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "app/bot.py"]
+

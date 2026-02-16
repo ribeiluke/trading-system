@@ -1,0 +1,82 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Temporal Worker",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}",
+          "remoteRoot": "/app"
+        },
+        {
+          "localRoot": "${workspaceFolder}/shared",
+          "remoteRoot": "/app/shared"
+        }
+      ],
+      "justMyCode": false
+    },
+    {
+      "name": "Scanner Service",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5679
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/services/scanner-service",
+          "remoteRoot": "/app"
+        },
+        {
+          "localRoot": "${workspaceFolder}/shared",
+          "remoteRoot": "/app/shared"
+        }
+      ],
+      "justMyCode": false
+    },
+    {
+      "name": "API Gateway",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5680
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/services",
+          "remoteRoot": "/app"
+        },
+        {
+          "localRoot": "${workspaceFolder}/shared",
+          "remoteRoot": "/app/shared"
+        }
+      ],
+      "justMyCode": false
+    }
+  ],
+  "compounds": [
+    {
+      "name": "🔥 Attach All Services",
+      "configurations": [
+        "Temporal Worker",
+        "Scanner Service",
+        "API Gateway"
+      ]
+    },
+    {
+      "name": "⚙️ Workers Only",
+      "configurations": [
+        "Temporal Worker",
+        "Scanner Service"
+      ]
+    }
+  ]
+}

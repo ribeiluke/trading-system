@@ -1,0 +1,17 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+
+# (optional) virtual environments
+.venv/
+venv/
+env/
+
+# (optional) IDE
+.vscode/
+.idea/
+dynamicconfig/

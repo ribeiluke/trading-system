@@ -5,12 +5,20 @@ description = "Temporal based trading platform scaffold"
 authors = ["you"]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.11,<3.15"
 fastapi = "*"
 uvicorn = "*"
 temporalio = "*"
 pydantic = "*"
 httpx = "*"
+ccxt = "^4.5.37"
+binance-sdk-derivatives-trading-usds-futures = "^7.0.0"
+pymongo = "^4.16.0"
+dotenv = "^0.9.9"
+pandas = "^3.0.0"
+ta-lib = "^0.6.8"
+debugpy = "^1.8.20"
+python-telegram-bot = "^22.6"
 
 [build-system]
 requires = ["poetry-core"]
