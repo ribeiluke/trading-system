@@ -4,12 +4,37 @@ from temporalio import activity
 
 from .service.limit_service import LimitService
 from shared.config.auth import get_futures_client
-from shared.models.trade_plan import ManagePositionParams, OrderParams, TradeParams
+from shared.models.trade_plan import (
+    ManagePositionIterationParams,
+    ManagePositionParams,
+    ManagePositionIterationResult,
+    OrderParams,
+    TradeParams
+)
 from shared.util.telegram import send_telegram_message
 
 class TradingLimitActivities:
     def __init__(self):
         self.trading_service = LimitService()
+
+    @activity.defn
+    async def set_leverage(
+        self, trade_params: TradeParams
+    ) -> int:
+        try:
+            client = get_futures_client(trade_params.api_key, trade_params.api_secret)
+            leverage = await asyncio.to_thread(
+                self.trading_service.set_leverage,
+                symbol=trade_params.symbol,
+                leverage=trade_params.leverage,
+                client=client
+            )
+            return leverage
+        except Exception as e:
+            activity.logger.exception(
+                f"new_order() error: {e}"
+            )
+            raise
 
     @activity.defn
     async def enter_limit(
@@ -41,7 +66,8 @@ class TradingLimitActivities:
                 self.trading_service.check_limit_order_filled,
                 symbol=order_params.trade_params.symbol,
                 order_id=order_params.order_id,
-                client=client
+                client=client,
+                wait_time_seconds=30
             )
 
             if is_filled:
@@ -49,15 +75,10 @@ class TradingLimitActivities:
                     f"New position started on {order_params.trade_params.symbol} " +
                     ("🚀" if order_params.trade_params.side == "BUY" else "☄️")
                 )
-
-                try:
-                    await send_telegram_message(
-                        chat_id=order_params.trade_params.chat_id,
-                        message=message
-                    )
-                except Exception as e:
-                    activity.logger.error(f"Telegram send failed: {e}")
-
+                await send_telegram_message(
+                    chat_id=order_params.trade_params.chat_id,
+                    message=message
+                )
             return is_filled, message if is_filled else ""
         except Exception as e:
             activity.logger.exception(
@@ -113,7 +134,7 @@ class TradingLimitActivities:
                 manage_position_params.trade_params.api_key,
                 manage_position_params.trade_params.api_secret
             )
-            await self.trading_service.manage_position(
+            await self.trading_service.manage_position_iteration(
                 user=manage_position_params.trade_params.user,
                 symbol=manage_position_params.trade_params.symbol,
                 side=manage_position_params.trade_params.side,
@@ -131,6 +152,40 @@ class TradingLimitActivities:
             )
         except Exception as e:
             activity.logger.exception(
-                f"manage_position() error: {e}"
+                f"manage_position_iteration() error: {e}"
+            )
+            raise
+
+    @activity.defn
+    async def manage_position_iteration(
+        self,
+        position_iter_params: ManagePositionIterationParams,
+    ) -> ManagePositionIterationResult:
+        try:
+            client = get_futures_client(
+                position_iter_params.params.trade_params.api_key,
+                position_iter_params.params.trade_params.api_secret
+            )
+            result = await self.trading_service.manage_position_iteration(
+                user=position_iter_params.params.trade_params.user,
+                symbol=position_iter_params.params.trade_params.symbol,
+                side=position_iter_params.params.trade_params.side,
+                stop_price=position_iter_params.params.trade_params.stop_price,
+                atr_value=position_iter_params.params.trade_params.atr_value,
+                atr_take_profit_mul=position_iter_params.params.trade_params.atr_take_profit_mul,
+                chat_id=position_iter_params.params.trade_params.chat_id,
+                leverage=position_iter_params.params.trade_params.leverage,
+                algo_id=position_iter_params.params.algo_id,
+                timeframe=position_iter_params.params.trade_params.timeframe,
+                atr_length=position_iter_params.params.trade_params.atr_length,
+                quantity_decimals=position_iter_params.params.trade_params.quantity_decimals,
+                trailing_stop_price=position_iter_params.trailing_stop_price,
+                take_profit_triggered=position_iter_params.take_profit_triggered,
+                client=client
+            )
+            return result
+        except Exception as e:
+            activity.logger.exception(
+                f"manage_position_iteration() error: {e}"
             )
             raise

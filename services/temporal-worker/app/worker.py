@@ -7,7 +7,7 @@ from temporalio.worker import Worker
 from shared.temporal.activities.limit_trading import TradingLimitActivities
 from shared.models.trade_plan import LIMIT_TRADING_TASK_QUEUE_NAME
 
-from shared.temporal.workflows.trade_workflow import LimitTrading
+from shared.temporal.workflows.trade_workflow import LimitTrading, ManagePositionWorkflow
 
 
 async def connect_temporal():
@@ -32,17 +32,22 @@ async def main() -> None:
     worker = Worker(
         client,
         task_queue=LIMIT_TRADING_TASK_QUEUE_NAME,
-        workflows=[LimitTrading],
+        workflows=[
+            LimitTrading,
+            ManagePositionWorkflow,
+        ],
         activities=[
+            activities.set_leverage,
             activities.enter_limit,
             activities.is_order_filled,
             activities.cancel_limit,
             activities.place_stop_order,
-            activities.manage_position
+            activities.manage_position_iteration,
         ],
     )
 
     await worker.run()
+
 
 
 

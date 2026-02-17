@@ -6,7 +6,13 @@ from temporalio.exceptions import ActivityError
 
 with workflow.unsafe.imports_passed_through():
     from shared.temporal.activities.limit_trading import TradingLimitActivities
-    from shared.models.trade_plan import ManagePositionParams, OrderParams, TradeParams
+    from shared.models.trade_plan import (
+        ManagePositionParams,
+        OrderParams,
+        TradeParams,
+        ManagePositionIterationParams,
+        LIMIT_TRADING_TASK_QUEUE_NAME
+    )
     from shared.util.telegram import send_telegram_message
 
 
@@ -19,6 +25,18 @@ class LimitTrading:
             maximum_attempts=10,
             maximum_interval=timedelta(seconds=2.0)
         )
+
+        # Set leverage
+        try:
+            trade_params.leverage = await workflow.execute_activity_method(
+                TradingLimitActivities.set_leverage,
+                trade_params,
+                start_to_close_timeout=timedelta(seconds=5.0),
+                retry_policy=retry_policy,
+            )
+        except ActivityError as set_leverage_error:
+            workflow.logger.error(f"Failed to set leverage: {set_leverage_error}")
+            raise set_leverage_error
 
         # Enter a trade
         try:
@@ -39,7 +57,7 @@ class LimitTrading:
                 OrderParams(
                     trade_params=trade_params, order_id=order_id
                 ),
-                start_to_close_timeout=timedelta(minutes=1.0),
+                start_to_close_timeout=timedelta(seconds=30.0),
                 retry_policy=retry_policy,
             )
 
@@ -72,13 +90,47 @@ class LimitTrading:
             retry_policy=retry_policy,
         )
 
-        await workflow.execute_activity_method(
-            TradingLimitActivities.manage_position,
+        await workflow.start_child_workflow(
+            ManagePositionWorkflow.run,
             ManagePositionParams(
                 trade_params=trade_params,
                 order_id=order_id,
                 algo_id=algo_id
             ),
-            start_to_close_timeout=timedelta(weeks=5.0),
-            retry_policy=retry_policy,
+            id=f"manage-{trade_params.user}-{trade_params.symbol}",
+            task_queue=LIMIT_TRADING_TASK_QUEUE_NAME,
+            run_timeout=timedelta(weeks=10),
+            parent_close_policy=workflow.ParentClosePolicy.ABANDON
         )
+
+@workflow.defn
+class ManagePositionWorkflow:
+    @workflow.run
+    async def run(self, params: ManagePositionParams):
+        trailing_stop_price = params.trade_params.stop_price
+        take_profit_triggered = False
+        finished = False
+
+        retry_policy = RetryPolicy(maximum_attempts=3)
+
+        while not finished:
+            result = await workflow.execute_activity_method(
+                TradingLimitActivities.manage_position_iteration,
+                ManagePositionIterationParams(
+                    params=params,
+                    trailing_stop_price=trailing_stop_price,
+                    take_profit_triggered=take_profit_triggered
+                ),
+                start_to_close_timeout=timedelta(minutes=1.0),
+                retry_policy=retry_policy,
+            )
+
+            trailing_stop_price = result.trailing_stop_price
+            take_profit_triggered = result.take_profit_triggered
+            finished = result.finished
+            params.trade_params.atr_value = result.atr_value
+
+            if not finished:
+                # Sleep inside workflow (does not block worker)
+                await workflow.sleep(params.trade_params.wait_time_seconds)
+        return "POSITION CLOSED"

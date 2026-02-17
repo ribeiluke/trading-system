@@ -24,7 +24,7 @@ class TradeParams:
     wait_time_seconds: int
     strategy_name: str
     risk_per_trade: float = 0.02
-    leverage: int = 10
+    leverage: int = 25
     quantity_decimals: int = 2
 
 
@@ -36,3 +36,16 @@ class OrderParams:
 @dataclass
 class ManagePositionParams(OrderParams):
     algo_id: int
+
+@dataclass
+class ManagePositionIterationParams:
+    params: ManagePositionParams
+    trailing_stop_price: float
+    take_profit_triggered: bool
+
+@dataclass
+class ManagePositionIterationResult:
+    atr_value: float
+    trailing_stop_price: float
+    take_profit_triggered: bool
+    finished: bool
