@@ -222,8 +222,6 @@ async def htf_rsi_ltf_channel_breakout_run(
         atr_period=strategy_parameters["atr_period"],
     )
 
-    entry_validation_dict["isTimeEnterLong"] = True
-
     await handle_trading_signal_caller(
         users=users,
         strategy_parameters=strategy_parameters,

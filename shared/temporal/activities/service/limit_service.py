@@ -42,6 +42,7 @@ class LimitService:
         side: str,
         quantity: float,
         client: DerivativesTradingUsdsFutures,
+        quantity_decimals: int,
         is_enter: bool = True
     ) -> int:
         try:
@@ -65,6 +66,27 @@ class LimitService:
             return order.data().order_id
         except Exception as e:
             logging.error(f"new_order() error: {e}")
+
+            msg = str(e)
+
+            # ✅ retry timestamp problems
+            if "-1111" in msg:
+                logging.warning(
+                    "Precision is over the maximum defined for this asset. Retrying..."
+                )
+                time.sleep(2)
+                try:
+                    return self.place_limit_order(
+                        symbol,
+                        side,
+                        round(quantity, quantity_decimals-1),
+                        client,
+                        quantity_decimals,
+                        is_enter
+                    )
+                except Exception as e:
+                    logging.error(f"Retry failed: {e}")
+                    raise
             raise
 
     def select_price_from_order_book(

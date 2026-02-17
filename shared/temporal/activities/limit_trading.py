@@ -47,6 +47,7 @@ class TradingLimitActivities:
                 symbol=trade_params.symbol,
                 side=trade_params.side,
                 quantity=trade_params.quantity,
+                quantity_decimals=trade_params.quantity_decimals,
                 client=client
             )
             return order_id
@@ -79,6 +80,8 @@ class TradingLimitActivities:
                     chat_id=order_params.trade_params.chat_id,
                     message=message
                 )
+            else:
+                raise Exception("Order not filled within the expected time frame.")
             return is_filled, message if is_filled else ""
         except Exception as e:
             activity.logger.exception(
