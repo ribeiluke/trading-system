@@ -315,144 +315,6 @@ class LimitService:
         else:
             return current_price >= trailing_stop_price
     
-    async def manage_position(
-        self,
-        user: str,
-        symbol: str,
-        side: str,
-        stop_price: float,
-        atr_value: float,
-        atr_take_profit_mul: float,
-        chat_id: int,
-        leverage: int,
-        algo_id: int,
-        timeframe: str,
-        atr_length: int,
-        wait_time_seconds: int,
-        quantity_decimals: int,
-        client: DerivativesTradingUsdsFutures
-    ):
-
-        """Manages a single iteration of the position logic."""
-        isDone = False
-        trailing_stop_price = stop_price
-        take_profit_triggered = False
-        take_profit_order_id = None
-        while not isDone:
-            try:
-                position = self.get_position(client=client, symbol=symbol)
-                if position is None:
-                    stop_order_status = self.get_algo_order_status(algo_id=algo_id, client=client)
-                    if (
-                        stop_order_status == "FINISHED" 
-                        or stop_order_status == "EXPIRED"
-                        or stop_order_status == "REJECTED"
-                    ):
-                        if chat_id:
-                            await send_telegram_message(chat_id, f"Position closed on {symbol}👀")
-                        isDone = True
-                    continue
-                current_price = float(position.mark_price)
-                position_pnl = float(position.un_realized_profit)
-                current_entry_price = float(position.entry_price)
-                position_size = abs(float(position.position_amt))
-                take_profit_price = self.get_take_profit_price(
-                    entry_price=current_entry_price,
-                    atr_value=atr_value,
-                    atr_take_profit_mul=atr_take_profit_mul,
-                    side=side
-                )
-
-                print("\n-----------------------------------")
-                print("\tBot Update")
-                print(f"Symbol: {position.symbol}")
-                print(f"Current price: {current_price}")
-                print(f"position size: {position_size}")
-                print(f"Current Entry price: {current_entry_price}")
-                print(f"Current profit: ${position_pnl}")
-                print(f"Current trailing stop price: {trailing_stop_price}")
-                print(f"Current take profit price: {take_profit_price}")
-                print(f"User: {user}")
-
-                # Log data to the database
-                log_data = {
-                    "symbol": position.symbol,
-                    "position": "Long" if side == "BUY" else "Short",
-                    "leverage": leverage,
-                    "current_price": current_price,
-                    "position_size": position_size,
-                    "current_entry_price": current_entry_price,
-                    "current_profit": position_pnl,
-                    "trailing_stop_price": trailing_stop_price,
-                    "take_profit_price": take_profit_price,
-                    "user": user,
-                    "timestamp": datetime.now(timezone.utc),
-                }
-                log_to_db(data=log_data)
-                print("Log successfully sent to the database.")
-
-                # Check take profit
-                if self.check_take_profit_triggered(current_price, take_profit_price, side):
-                    if not take_profit_triggered:
-                        take_profit_size = round((position_size / 2), quantity_decimals)
-                        take_profit_order_id = self.place_limit_order(
-                            symbol=symbol,
-                            side="SELL" if side == "BUY" else "BUY",
-                            quantity=take_profit_size,
-                            client=client,
-                            is_enter=False
-                        )
-                        is_filled = self.check_limit_order_filled(
-                            symbol=symbol,
-                            order_id=take_profit_order_id,
-                            client=client,
-                            wait_time_seconds=30
-                        )
-
-                        if chat_id and is_filled:
-                            await send_telegram_message(chat_id, f"Take profit taken on {symbol}💰")
-                            take_profit_triggered = True
-                        
-                        if not is_filled:
-                            logging.warning(
-                                f"Take profit order {take_profit_order_id} not filled within deadline."
-                            )
-                            self.cancel_order_for_manage_position(
-                                symbol=symbol, order_id=take_profit_order_id, client=client
-                            )
-
-                # Check trailing stop
-                if self.check_trailing_stop_triggered(current_price, trailing_stop_price, side):
-                    position_size = position_size
-                    _ = self.place_limit_order(
-                        symbol=symbol,
-                        side="SELL" if side == "BUY" else "BUY",
-                        quantity=position_size,
-                        client=client,
-                        is_enter=False
-                    )
-
-                else:
-                    atr_value = get_latest_atr(
-                        instrument=symbol,
-                        timeframe=timeframe,
-                        atr_length=atr_length,
-                    )
-                    trailing_stop_price = get_current_atr_trailing_stop(
-                        symbol=symbol,
-                        atr_multiplier=atr_take_profit_mul,
-                        latest_market_price=current_price,
-                        latest_trail_price=trailing_stop_price,
-                        atr_value=atr_value,
-                        side=side,
-                        timeframe=timeframe,
-                    )
-                
-                time.sleep(wait_time_seconds)
-            except Exception as e:
-                logging.critical(f"Fatal error in manage_position loop: {e}")
-                traceback.print_exc()
-    
     async def manage_position_iteration(
         self,
         user: str,
@@ -529,7 +391,8 @@ class LimitService:
                         side="SELL" if side == "BUY" else "BUY",
                         quantity=take_profit_size,
                         client=client,
-                        is_enter=False
+                        is_enter=False,
+                        quantity_decimals=quantity_decimals
                     )
                     is_filled = self.check_limit_order_filled(
                         symbol=symbol,
@@ -558,7 +421,8 @@ class LimitService:
                     side="SELL" if side == "BUY" else "BUY",
                     quantity=position_size,
                     client=client,
-                    is_enter=False
+                    is_enter=False,
+                    quantity_decimals=quantity_decimals
                 )
             else:
                 atr_value = get_latest_atr(
