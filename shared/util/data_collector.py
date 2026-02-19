@@ -107,3 +107,13 @@ def get_latest_ask(symbol: str) -> float:
         return float(order_book.asks[0].root[0])
     except Exception as e:
         logging.error(f"get_latest_ask() error: {e}")
+
+
+def get_24h_price_change(symbol: str | None = None) -> float:
+    try:
+        client = get_futures_unauthenticated_client()
+        price_change = client.rest_api.ticker24hr_price_change_statistics(symbol)
+        price_change = price_change.data().actual_instance
+        return price_change
+    except Exception as e:
+        logging.error(f"get_24h_price_change() error: {e}")

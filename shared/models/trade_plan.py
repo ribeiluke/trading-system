@@ -1,7 +1,7 @@
 # placeholder shared model
 from dataclasses import dataclass
 
-LIMIT_TRADING_TASK_QUEUE_NAME = "LIMIT_TRADING_TASK_QUEUE"
+TRADING_TASK_QUEUE_NAME = "LIMIT_TRADING_TASK_QUEUE"
 
 @dataclass
 class TradeParams:

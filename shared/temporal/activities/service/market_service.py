@@ -23,8 +23,8 @@ from shared.util.stop import get_current_atr_trailing_stop
 from shared.util.telegram import send_telegram_message
 from shared.temporal.activities.service.trading_service import TradingService
 
-class LimitService(TradingService):
-    def place_limit_order(
+class MarketService(TradingService):
+    def place_market_order(
         self,
         symbol: str,
         side: str,
@@ -37,19 +37,9 @@ class LimitService(TradingService):
             order = client.rest_api.new_order(
                 symbol=symbol,
                 side=NewOrderSideEnum[side].value,
-                type="LIMIT",
+                type="MARKET",
                 quantity=quantity,
-                reduce_only="false" if is_enter else "true",
-                price_match=NewOrderPriceMatchEnum["QUEUE"].value,
-                time_in_force=(
-                    NewOrderTimeInForceEnum["GTC"].value 
-                    if is_enter 
-                    else NewOrderTimeInForceEnum["GTC"].value
-                ),
-                good_till_date = (
-                    None if is_enter
-                    else int((datetime.now(timezone.utc) + timedelta(minutes=10)).timestamp())
-                )
+                reduce_only="false" if is_enter else "true"
             )
             return order.data().order_id
         except Exception as e:
@@ -64,7 +54,7 @@ class LimitService(TradingService):
                 )
                 time.sleep(2)
                 try:
-                    return self.place_limit_order(
+                    return self.place_market_order(
                         symbol,
                         side,
                         round(quantity, quantity_decimals-1),
@@ -76,44 +66,6 @@ class LimitService(TradingService):
                     logging.error(f"Retry failed: {e}")
                     raise
             raise
-    
-    def check_limit_order_filled(
-        self,
-        symbol: str,
-        order_id: int,
-        client: DerivativesTradingUsdsFutures,
-        wait_time_seconds: int = 1,
-    ) -> bool:
-        deadline = datetime.now(timezone.utc) + timedelta(seconds=wait_time_seconds)
-
-        while datetime.now(timezone.utc) < deadline:
-            try:
-                order = client.rest_api.query_order(
-                    symbol=symbol,
-                    order_id=order_id
-                )
-
-                status = order.data().get("status", "")
-                if status == "FILLED":
-                    return True
-
-            except Exception as e:
-                msg = str(e)
-
-                # ✅ retry timestamp problems
-                if "-1021" in msg:
-                    logging.warning("Clock drift detected. Retrying...")
-                    time.sleep(2)
-                    continue
-
-                # other errors → real failures
-                logging.exception("query_order failed")
-                raise
-
-            time.sleep(5)
-
-        logging.info("Order not filled within deadline")
-        return False
     
     async def manage_position_iteration(
         self,
@@ -186,7 +138,7 @@ class LimitService(TradingService):
             if self.check_take_profit_triggered(current_price, take_profit_price, side):
                 if not take_profit_triggered:
                     take_profit_size = round((position_size / 2), quantity_decimals)
-                    take_profit_order_id = self.place_limit_order(
+                    _ = self.place_market_order(
                         symbol=symbol,
                         side="SELL" if side == "BUY" else "BUY",
                         quantity=take_profit_size,
@@ -194,29 +146,15 @@ class LimitService(TradingService):
                         is_enter=False,
                         quantity_decimals=quantity_decimals
                     )
-                    is_filled = self.check_limit_order_filled(
-                        symbol=symbol,
-                        order_id=take_profit_order_id,
-                        client=client,
-                        wait_time_seconds=30
-                    )
 
-                    if chat_id and is_filled:
+                    if chat_id:
                         await send_telegram_message(chat_id, f"Take profit taken on {symbol}💰")
                         take_profit_triggered = True
-                    
-                    if not is_filled:
-                        logging.warning(
-                            f"Take profit order {take_profit_order_id} not filled within deadline."
-                        )
-                        self.cancel_order_for_manage_position(
-                            symbol=symbol, order_id=take_profit_order_id, client=client
-                        )
 
             # Check trailing stop
             if self.check_trailing_stop_triggered(current_price, trailing_stop_price, side):
                 position_size = position_size
-                _ = self.place_limit_order(
+                _ = self.place_market_order(
                     symbol=symbol,
                     side="SELL" if side == "BUY" else "BUY",
                     quantity=position_size,
