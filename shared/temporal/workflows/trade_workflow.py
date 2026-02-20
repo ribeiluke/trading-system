@@ -22,7 +22,7 @@ class LimitTrading:
     @workflow.run
     async def run(self, trade_params: TradeParams) -> str:
         retry_policy = RetryPolicy(
-            maximum_attempts=10,
+            maximum_attempts=5,
             maximum_interval=timedelta(seconds=2.0)
         )
 
@@ -43,29 +43,34 @@ class LimitTrading:
             order_id = await workflow.execute_activity_method(
                 TradingLimitActivities.enter_limit,
                 trade_params,
-                start_to_close_timeout=timedelta(seconds=10.0),
+                start_to_close_timeout=timedelta(seconds=5.0),
                 retry_policy=retry_policy,
             )
         except ActivityError as enter_err:
             workflow.logger.error(f"Failed to enter trade: {enter_err}")
             raise enter_err
 
-        # Check if the order is filled
-        try:
-            is_filled, message = await workflow.execute_activity_method(
-                TradingLimitActivities.is_order_filled,
-                OrderParams(
-                    trade_params=trade_params, order_id=order_id
-                ),
-                start_to_close_timeout=timedelta(seconds=30.0),
-                retry_policy=retry_policy,
-            )
+        deadline = workflow.now() + timedelta(seconds=30)
 
-            workflow.logger.info(f"Order {order_id} filled status: {is_filled}")
+        while workflow.now() < deadline:
+            try:
+                is_filled = await workflow.execute_activity_method(
+                    TradingLimitActivities.is_order_filled,
+                    OrderParams(
+                        trade_params=trade_params, order_id=order_id
+                    ),
+                    start_to_close_timeout=timedelta(seconds=5.0),
+                    retry_policy=retry_policy,
+                )
+                workflow.logger.info(f"Order {order_id} filled status: {is_filled}")
+                if is_filled:
+                    break
+                await workflow.sleep(5)
+            except ActivityError as filled_err:
+                workflow.logger.error(f"Order check failed: {filled_err}")
+                raise filled_err
 
-        except ActivityError as filled_err:
-            workflow.logger.error(f"Order check failed: {filled_err}")
-            # Attempt to cancel the order
+        if not is_filled:
             try:
                 status = await workflow.execute_activity_method(
                     TradingLimitActivities.cancel_limit,
@@ -79,9 +84,14 @@ class LimitTrading:
                     f"Cancel successful. Confirmation status: {status}"
                 )
                 return f"Order {order_id} was not filled and has been cancelled. Status: {status}"
-            except TimeoutError as cancel_error:
+            except ActivityError as cancel_error:
                 workflow.logger.error(f"Cancel failed: {cancel_error}")
-                raise cancel_error from filled_err
+                if "-2011" in str(cancel_error):
+                    workflow.logger.warning(
+                        "Order already filled during cancellation attempt."
+                    )
+                else:
+                    raise cancel_error
     
         algo_id = await workflow.execute_activity_method(
             TradingLimitActivities.place_stop_order,
@@ -132,7 +142,7 @@ class ManageLimitPositionWorkflow:
 
             if not finished:
                 # Sleep inside workflow (does not block worker)
-                await workflow.sleep(params.trade_params.wait_time_seconds)
+                await workflow.sleep((params.trade_params.wait_time_seconds) / 2)
         return "POSITION CLOSED"
 
 
@@ -218,5 +228,5 @@ class ManageMarketPositionWorkflow:
 
             if not finished:
                 # Sleep inside workflow (does not block worker)
-                await workflow.sleep(params.trade_params.wait_time_seconds)
+                await workflow.sleep((params.trade_params.wait_time_seconds) / 2)
         return "POSITION CLOSED"

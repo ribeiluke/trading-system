@@ -58,7 +58,7 @@ class TradingLimitActivities:
             raise
 
     @activity.defn
-    async def is_order_filled(self, order_params:OrderParams) -> tuple[bool, str]:
+    async def is_order_filled(self, order_params:OrderParams) -> bool:
         try:
             client = get_futures_client(
                 order_params.trade_params.api_key, order_params.trade_params.api_secret
@@ -67,8 +67,7 @@ class TradingLimitActivities:
                 self.trading_service.check_limit_order_filled,
                 symbol=order_params.trade_params.symbol,
                 order_id=order_params.order_id,
-                client=client,
-                wait_time_seconds=30
+                client=client
             )
 
             if is_filled:
@@ -80,9 +79,7 @@ class TradingLimitActivities:
                     chat_id=order_params.trade_params.chat_id,
                     message=message
                 )
-            else:
-                raise Exception("Order not filled within the expected time frame.")
-            return is_filled, message if is_filled else ""
+            return is_filled
         except Exception as e:
             activity.logger.exception(
                 f"check_limit_order_filled() error: {e}"

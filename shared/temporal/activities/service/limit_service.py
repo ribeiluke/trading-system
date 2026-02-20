@@ -82,35 +82,21 @@ class LimitService(TradingService):
         symbol: str,
         order_id: int,
         client: DerivativesTradingUsdsFutures,
-        wait_time_seconds: int = 1,
     ) -> bool:
-        deadline = datetime.now(timezone.utc) + timedelta(seconds=wait_time_seconds)
+        try:
+            order = client.rest_api.query_order(
+                symbol=symbol,
+                order_id=order_id
+            )
 
-        while datetime.now(timezone.utc) < deadline:
-            try:
-                order = client.rest_api.query_order(
-                    symbol=symbol,
-                    order_id=order_id
-                )
+            status = order.data().get("status", "")
+            if status == "FILLED":
+                return True
 
-                status = order.data().get("status", "")
-                if status == "FILLED":
-                    return True
-
-            except Exception as e:
-                msg = str(e)
-
-                # ✅ retry timestamp problems
-                if "-1021" in msg:
-                    logging.warning("Clock drift detected. Retrying...")
-                    time.sleep(2)
-                    continue
-
-                # other errors → real failures
-                logging.exception("query_order failed")
-                raise
-
-            time.sleep(5)
+        except Exception as e:
+            # other errors → real failures
+            logging.exception("query_order failed")
+            raise
 
         logging.info("Order not filled within deadline")
         return False
