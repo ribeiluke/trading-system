@@ -222,7 +222,6 @@ class TradingService:
         user: str,
         symbol: str,
         side: str,
-        stop_price: float,
         atr_value: float,
         atr_take_profit_mul: float,
         chat_id: int,

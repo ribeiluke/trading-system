@@ -106,7 +106,6 @@ class LimitService(TradingService):
         user: str,
         symbol: str,
         side: str,
-        stop_price: float,
         atr_value: float,
         atr_take_profit_mul: float,
         chat_id: int,
@@ -117,6 +116,8 @@ class LimitService(TradingService):
         quantity_decimals: int,
         trailing_stop_price: float,
         take_profit_triggered: bool,
+        take_profit_order_id: Optional[int],
+        profit_count: int,
         client: DerivativesTradingUsdsFutures
     ):
         """Run a single iteration of position management logic"""
@@ -132,12 +133,16 @@ class LimitService(TradingService):
                             atr_value=atr_value,
                             take_profit_triggered=take_profit_triggered,
                             trailing_stop_price=trailing_stop_price,
+                            take_profit_order_id=take_profit_order_id,
+                            profit_count=profit_count,
                             finished=True
                         )
                 return ManagePositionIterationResult(
                         atr_value=atr_value,
                         take_profit_triggered=take_profit_triggered,
                         trailing_stop_price=trailing_stop_price,
+                        take_profit_order_id=take_profit_order_id,
+                        profit_count=profit_count,
                         finished=False
                     )
 
@@ -168,9 +173,9 @@ class LimitService(TradingService):
             }
             log_to_db(data=log_data)
 
-            # Check take profit
+            # Check take profit conditions
             if self.check_take_profit_triggered(current_price, take_profit_price, side):
-                if not take_profit_triggered:
+                if not take_profit_triggered and not take_profit_order_id:
                     take_profit_size = round((position_size / 2), quantity_decimals)
                     take_profit_order_id = self.place_limit_order(
                         symbol=symbol,
@@ -180,24 +185,36 @@ class LimitService(TradingService):
                         is_enter=False,
                         quantity_decimals=quantity_decimals
                     )
-                    is_filled = self.check_limit_order_filled(
+                
+            if take_profit_order_id:
+                is_filled = self.check_limit_order_filled(
                         symbol=symbol,
                         order_id=take_profit_order_id,
-                        client=client,
-                        wait_time_seconds=30
+                        client=client
                     )
-
-                    if chat_id and is_filled:
-                        await send_telegram_message(chat_id, f"Take profit taken on {symbol}💰")
-                        take_profit_triggered = True
-                    
+                if profit_count >= 10:
+                    logging.warning(
+                        f"Take profit order {take_profit_order_id} has been active for 10 iterations. Canceling to prevent infinite loop."
+                    )
                     if not is_filled:
                         logging.warning(
                             f"Take profit order {take_profit_order_id} not filled within deadline."
                         )
-                        self.cancel_order_for_manage_position(
+                        status = self.cancel_order(
                             symbol=symbol, order_id=take_profit_order_id, client=client
                         )
+                        if status == "CANCELED":
+                            logging.info(f"Take profit order {take_profit_order_id} canceled successfully.")
+                            take_profit_order_id = None
+                            profit_count = 0
+
+                if chat_id and is_filled:
+                    await send_telegram_message(chat_id, f"Take profit taken on {symbol}💰")
+                    take_profit_triggered = True
+                    take_profit_order_id = None
+                
+                profit_count += 1
+                    
 
             # Check trailing stop
             if self.check_trailing_stop_triggered(current_price, trailing_stop_price, side):
@@ -230,6 +247,8 @@ class LimitService(TradingService):
                 atr_value=atr_value,
                 take_profit_triggered=take_profit_triggered,
                 trailing_stop_price=trailing_stop_price,
+                take_profit_order_id=take_profit_order_id,
+                profit_count=profit_count,
                 finished=False
             )
 

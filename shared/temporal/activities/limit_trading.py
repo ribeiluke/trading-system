@@ -170,7 +170,6 @@ class TradingLimitActivities:
                 user=position_iter_params.params.trade_params.user,
                 symbol=position_iter_params.params.trade_params.symbol,
                 side=position_iter_params.params.trade_params.side,
-                stop_price=position_iter_params.params.trade_params.stop_price,
                 atr_value=position_iter_params.params.trade_params.atr_value,
                 atr_take_profit_mul=position_iter_params.params.trade_params.atr_take_profit_mul,
                 chat_id=position_iter_params.params.trade_params.chat_id,
@@ -181,6 +180,8 @@ class TradingLimitActivities:
                 quantity_decimals=position_iter_params.params.trade_params.quantity_decimals,
                 trailing_stop_price=position_iter_params.trailing_stop_price,
                 take_profit_triggered=position_iter_params.take_profit_triggered,
+                take_profit_order_id=position_iter_params.take_profit_order_id,
+                profit_count=position_iter_params.profit_count,
                 client=client
             )
             return result

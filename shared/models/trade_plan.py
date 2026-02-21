@@ -1,5 +1,6 @@
 # placeholder shared model
 from dataclasses import dataclass
+from typing import Optional
 
 TRADING_TASK_QUEUE_NAME = "LIMIT_TRADING_TASK_QUEUE"
 
@@ -42,10 +43,14 @@ class ManagePositionIterationParams:
     params: ManagePositionParams
     trailing_stop_price: float
     take_profit_triggered: bool
+    take_profit_order_id: Optional[int]
+    profit_count: int = 0
 
 @dataclass
 class ManagePositionIterationResult:
     atr_value: float
     trailing_stop_price: float
     take_profit_triggered: bool
+    take_profit_order_id: Optional[int]
     finished: bool
+    profit_count: int = 0

@@ -119,6 +119,8 @@ class ManageLimitPositionWorkflow:
     async def run(self, params: ManagePositionParams):
         trailing_stop_price = params.trade_params.stop_price
         take_profit_triggered = False
+        take_profit_order_id = None
+        profit_count = 0
         finished = False
 
         retry_policy = RetryPolicy(maximum_attempts=3)
@@ -129,14 +131,18 @@ class ManageLimitPositionWorkflow:
                 ManagePositionIterationParams(
                     params=params,
                     trailing_stop_price=trailing_stop_price,
-                    take_profit_triggered=take_profit_triggered
+                    take_profit_triggered=take_profit_triggered,
+                    take_profit_order_id=take_profit_order_id,
+                    profit_count=profit_count
                 ),
-                start_to_close_timeout=timedelta(minutes=1.0),
+                start_to_close_timeout=timedelta(seconds=5.0),
                 retry_policy=retry_policy,
             )
 
             trailing_stop_price = result.trailing_stop_price
             take_profit_triggered = result.take_profit_triggered
+            take_profit_order_id = result.take_profit_order_id
+            profit_count = result.profit_count
             finished = result.finished
             params.trade_params.atr_value = result.atr_value
 
@@ -205,6 +211,7 @@ class ManageMarketPositionWorkflow:
     async def run(self, params: ManagePositionParams):
         trailing_stop_price = params.trade_params.stop_price
         take_profit_triggered = False
+        take_profit_order_id = None
         finished = False
 
         retry_policy = RetryPolicy(maximum_attempts=3)
@@ -215,7 +222,8 @@ class ManageMarketPositionWorkflow:
                 ManagePositionIterationParams(
                     params=params,
                     trailing_stop_price=trailing_stop_price,
-                    take_profit_triggered=take_profit_triggered
+                    take_profit_triggered=take_profit_triggered,
+                    take_profit_order_id=take_profit_order_id
                 ),
                 start_to_close_timeout=timedelta(seconds=5.0),
                 retry_policy=retry_policy,
@@ -223,6 +231,7 @@ class ManageMarketPositionWorkflow:
 
             trailing_stop_price = result.trailing_stop_price
             take_profit_triggered = result.take_profit_triggered
+            take_profit_order_id = result.take_profit_order_id
             finished = result.finished
             params.trade_params.atr_value = result.atr_value
 

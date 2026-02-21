@@ -72,7 +72,6 @@ class MarketService(TradingService):
         user: str,
         symbol: str,
         side: str,
-        stop_price: float,
         atr_value: float,
         atr_take_profit_mul: float,
         chat_id: int,
@@ -83,6 +82,7 @@ class MarketService(TradingService):
         quantity_decimals: int,
         trailing_stop_price: float,
         take_profit_triggered: bool,
+        take_profit_order_id: Optional[int],
         client: DerivativesTradingUsdsFutures
     ):
         """Run a single iteration of position management logic"""
@@ -98,12 +98,14 @@ class MarketService(TradingService):
                             atr_value=atr_value,
                             take_profit_triggered=take_profit_triggered,
                             trailing_stop_price=trailing_stop_price,
+                            take_profit_order_id=take_profit_order_id,
                             finished=True
                         )
                 return ManagePositionIterationResult(
                         atr_value=atr_value,
                         take_profit_triggered=take_profit_triggered,
                         trailing_stop_price=trailing_stop_price,
+                        take_profit_order_id=take_profit_order_id,
                         finished=False
                     )
 
@@ -138,7 +140,7 @@ class MarketService(TradingService):
             if self.check_take_profit_triggered(current_price, take_profit_price, side):
                 if not take_profit_triggered:
                     take_profit_size = round((position_size / 2), quantity_decimals)
-                    _ = self.place_market_order(
+                    take_profit_order_id = self.place_market_order(
                         symbol=symbol,
                         side="SELL" if side == "BUY" else "BUY",
                         quantity=take_profit_size,
@@ -182,6 +184,7 @@ class MarketService(TradingService):
                 atr_value=atr_value,
                 take_profit_triggered=take_profit_triggered,
                 trailing_stop_price=trailing_stop_price,
+                take_profit_order_id=take_profit_order_id,
                 finished=False
             )
 
