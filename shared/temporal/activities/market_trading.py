@@ -111,7 +111,6 @@ class TradingMarketActivities:
                 trailing_stop_price=position_iter_params.trailing_stop_price,
                 take_profit_triggered=position_iter_params.take_profit_triggered,
                 take_profit_order_id=position_iter_params.take_profit_order_id,
-                profit_count=position_iter_params.profit_count,
                 client=client
             )
             return result
