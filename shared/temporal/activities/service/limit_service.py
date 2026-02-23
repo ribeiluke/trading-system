@@ -259,5 +259,6 @@ class LimitService(TradingService):
                 atr_value=atr_value,
                 take_profit_triggered=take_profit_triggered,
                 trailing_stop_price=trailing_stop_price,
+                take_profit_order_id=take_profit_order_id,
                 finished=False
             )
