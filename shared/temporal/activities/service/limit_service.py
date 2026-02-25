@@ -255,10 +255,4 @@ class LimitService(TradingService):
         except Exception as e:
             logging.critical(f"Error in manage_position_iteration: {e}")
             traceback.print_exc()
-            return ManagePositionIterationResult(
-                atr_value=atr_value,
-                take_profit_triggered=take_profit_triggered,
-                trailing_stop_price=trailing_stop_price,
-                take_profit_order_id=take_profit_order_id,
-                finished=False
-            )
+            raise

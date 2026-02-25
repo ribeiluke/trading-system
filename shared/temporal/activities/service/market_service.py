@@ -24,14 +24,13 @@ from shared.util.telegram import send_telegram_message
 from shared.temporal.activities.service.trading_service import TradingService
 
 class MarketService(TradingService):
-    def place_market_order(
+    def enter_market_order(
         self,
         symbol: str,
         side: str,
         quantity: float,
         client: DerivativesTradingUsdsFutures,
-        quantity_decimals: int,
-        is_enter: bool = True
+        quantity_decimals: int
     ) -> int:
         try:
             order = client.rest_api.new_order(
@@ -39,7 +38,7 @@ class MarketService(TradingService):
                 side=NewOrderSideEnum[side].value,
                 type="MARKET",
                 quantity=quantity,
-                reduce_only="false" if is_enter else "true"
+                reduce_only="false"
             )
             return order.data().order_id
         except Exception as e:
@@ -54,13 +53,12 @@ class MarketService(TradingService):
                 )
                 time.sleep(2)
                 try:
-                    return self.place_market_order(
+                    return self.enter_market_order(
                         symbol,
                         side,
                         round(quantity, quantity_decimals-1),
                         client,
-                        quantity_decimals,
-                        is_enter
+                        quantity_decimals
                     )
                 except Exception as e:
                     logging.error(f"Retry failed: {e}")
@@ -140,7 +138,7 @@ class MarketService(TradingService):
             if self.check_take_profit_triggered(current_price, take_profit_price, side):
                 if not take_profit_triggered:
                     take_profit_size = round((position_size / 2), quantity_decimals)
-                    take_profit_order_id = self.place_market_order(
+                    take_profit_order_id = self.enter_market_order(
                         symbol=symbol,
                         side="SELL" if side == "BUY" else "BUY",
                         quantity=take_profit_size,
@@ -156,12 +154,11 @@ class MarketService(TradingService):
             # Check trailing stop
             if self.check_trailing_stop_triggered(current_price, trailing_stop_price, side):
                 position_size = position_size
-                _ = self.place_market_order(
+                _ = self.exit_market_order(
                     symbol=symbol,
-                    side="SELL" if side == "BUY" else "BUY",
+                    side=side,
                     quantity=position_size,
                     client=client,
-                    is_enter=False,
                     quantity_decimals=quantity_decimals
                 )
             else:

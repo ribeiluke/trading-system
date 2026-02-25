@@ -84,6 +84,59 @@ class TradingService:
             return response.data().status
         except Exception as e:
             logging.error(f"cancel_order() error: {e}")
+            msg = str(e)
+
+            # ✅ retry timestamp problems
+            if "-2011" in msg:
+                message = "Order already filled during cancellation attempt."
+                logging.warning(
+                    "Order already filled during cancellation attempt."
+                )
+                return message
+            raise e
+    
+    def exit_market_order(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        quantity_decimals: int,
+        client: DerivativesTradingUsdsFutures
+    ) -> int:
+        try:
+            exit_side = (
+                "SELL" if side == "BUY" else "BUY"
+            )
+            order = client.rest_api.new_order(
+                symbol=symbol,
+                side=NewOrderSideEnum[exit_side].value,
+                type="MARKET",
+                quantity=quantity,
+                reduce_only="true"
+            )
+            return order.data().order_id
+        except Exception as e:
+            logging.error(f"new_order() error: {e}")
+
+            msg = str(e)
+
+            # ✅ retry timestamp problems
+            if "-1111" in msg:
+                logging.warning(
+                    "Precision is over the maximum defined for this asset. Retrying..."
+                )
+                time.sleep(2)
+                try:
+                    return self.exit_market_order(
+                        symbol,
+                        side,
+                        round(quantity, quantity_decimals-1),
+                        quantity_decimals,
+                        client
+                    )
+                except Exception as e:
+                    logging.error(f"Retry failed: {e}")
+                    raise
             raise
 
     def cancel_order_for_manage_position(

@@ -103,7 +103,7 @@ class TradingLimitActivities:
             activity.logger.exception(
                 f"cancel_order() error: {e}"
             )
-            raise
+            raise e
     
     @activity.defn
     async def place_stop_order(self, trade_params: TradeParams) -> int:
@@ -125,34 +125,29 @@ class TradingLimitActivities:
             raise
     
     @activity.defn
-    async def manage_position(
-        self,
-        manage_position_params: ManagePositionParams,
-    ):
+    async def exit_market_for_limit_position(
+        self, trade_params: TradeParams
+    ) -> int:
         try:
-            client = get_futures_client(
-                manage_position_params.trade_params.api_key,
-                manage_position_params.trade_params.api_secret
-            )
-            await self.trading_service.manage_position_iteration(
-                user=manage_position_params.trade_params.user,
-                symbol=manage_position_params.trade_params.symbol,
-                side=manage_position_params.trade_params.side,
-                stop_price=manage_position_params.trade_params.stop_price,
-                atr_value=manage_position_params.trade_params.atr_value,
-                atr_take_profit_mul=manage_position_params.trade_params.atr_take_profit_mul,
-                chat_id=manage_position_params.trade_params.chat_id,
-                leverage=manage_position_params.trade_params.leverage,
-                algo_id=manage_position_params.algo_id,
-                timeframe=manage_position_params.trade_params.timeframe,
-                atr_length=manage_position_params.trade_params.atr_length,
-                wait_time_seconds=manage_position_params.trade_params.wait_time_seconds,
-                quantity_decimals=manage_position_params.trade_params.quantity_decimals,
+            client = get_futures_client(trade_params.api_key, trade_params.api_secret)
+            order_id = await asyncio.to_thread(
+                self.trading_service.exit_market_order,
+                symbol=trade_params.symbol,
+                side=trade_params.side,
+                quantity=trade_params.quantity,
+                quantity_decimals=trade_params.quantity_decimals,
                 client=client
             )
+
+            await send_telegram_message(
+                chat_id=trade_params.chat_id,
+                message=f"Position closed on {trade_params.symbol}👀"
+            )
+
+            return order_id
         except Exception as e:
             activity.logger.exception(
-                f"manage_position_iteration() error: {e}"
+                f"new_order() error: {e}"
             )
             raise
 

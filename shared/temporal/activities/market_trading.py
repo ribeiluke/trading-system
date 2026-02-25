@@ -16,7 +16,7 @@ from shared.util.telegram import send_telegram_message
 class TradingMarketActivities:
     def __init__(self):
         self.trading_service = MarketService()
-
+    
     @activity.defn
     async def set_market_leverage(
         self, trade_params: TradeParams
@@ -43,7 +43,7 @@ class TradingMarketActivities:
         try:
             client = get_futures_client(trade_params.api_key, trade_params.api_secret)
             order_id = await asyncio.to_thread(
-                self.trading_service.place_market_order,
+                self.trading_service.enter_market_order,
                 symbol=trade_params.symbol,
                 side=trade_params.side,
                 quantity=trade_params.quantity,
@@ -68,7 +68,7 @@ class TradingMarketActivities:
             raise
     
     @activity.defn
-    async def place_market_stop_order(self, trade_params: TradeParams) -> int:
+    async def place_stop_market_order(self, trade_params: TradeParams) -> int:
         try:
             client = get_futures_client(trade_params.api_key, trade_params.api_secret)
             algo_id = await asyncio.to_thread(
@@ -83,6 +83,33 @@ class TradingMarketActivities:
         except Exception as e:
             activity.logger.exception(
                 f"stop_order() error: {e}"
+            )
+            raise
+    
+    @activity.defn
+    async def exit_market(
+        self, trade_params: TradeParams
+    ) -> int:
+        try:
+            client = get_futures_client(trade_params.api_key, trade_params.api_secret)
+            order_id = await asyncio.to_thread(
+                self.trading_service.exit_market_order,
+                symbol=trade_params.symbol,
+                side=trade_params.side,
+                quantity=trade_params.quantity,
+                quantity_decimals=trade_params.quantity_decimals,
+                client=client
+            )
+
+            await send_telegram_message(
+                chat_id=trade_params.chat_id,
+                message=f"Position closed on {trade_params.symbol}👀"
+            )
+
+            return order_id
+        except Exception as e:
+            activity.logger.exception(
+                f"new_order() error: {e}"
             )
             raise
 

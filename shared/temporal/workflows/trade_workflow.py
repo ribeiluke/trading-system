@@ -22,7 +22,7 @@ class LimitTrading:
     @workflow.run
     async def run(self, trade_params: TradeParams) -> str:
         retry_policy = RetryPolicy(
-            maximum_attempts=5,
+            maximum_attempts=10,
             maximum_interval=timedelta(seconds=2.0)
         )
 
@@ -83,22 +83,36 @@ class LimitTrading:
                 workflow.logger.info(
                     f"Cancel successful. Confirmation status: {status}"
                 )
-                return f"Order {order_id} was not filled and has been cancelled. Status: {status}"
+                if status == "CANCELED":
+                    return f"Order {order_id} was not filled and has been cancelled. Status: {status}"
             except ActivityError as cancel_error:
                 workflow.logger.error(f"Cancel failed: {cancel_error}")
-                if "-2011" in str(cancel_error):
-                    workflow.logger.warning(
-                        "Order already filled during cancellation attempt."
-                    )
-                else:
-                    raise cancel_error
+                raise cancel_error
     
-        algo_id = await workflow.execute_activity_method(
-            TradingLimitActivities.place_stop_order,
-            trade_params,
-            start_to_close_timeout=timedelta(seconds=5),
-            retry_policy=retry_policy,
-        )
+        try:
+            algo_id = await workflow.execute_activity_method(
+                        TradingLimitActivities.place_stop_order,
+                        trade_params,
+                        start_to_close_timeout=timedelta(seconds=5),
+                        retry_policy=retry_policy,
+                    )
+        except ActivityError as stop_err:
+            workflow.logger.error(f"Failed to place stop order: {stop_err}")
+            try:
+                order_id = await workflow.execute_activity_method(
+                        TradingLimitActivities.exit_market_for_limit_position,
+                        trade_params,
+                        start_to_close_timeout=timedelta(seconds=5),
+                        retry_policy=retry_policy,
+                    )
+                workflow.logger.info(
+                    f"Emergency exit was successful. Confirmation ID: {order_id}"
+                )
+            except ActivityError as exit_err:
+                workflow.logger.error(f"Failed to place exit market order: {exit_err}")
+                raise exit_err from stop_err
+            
+            raise stop_err
 
         await workflow.start_child_workflow(
             ManageLimitPositionWorkflow.run,
@@ -123,7 +137,7 @@ class ManageLimitPositionWorkflow:
         profit_count = 0
         finished = False
 
-        retry_policy = RetryPolicy(maximum_attempts=3)
+        retry_policy = RetryPolicy(maximum_attempts=10)
 
         while not finished:
             result = await workflow.execute_activity_method(
@@ -185,12 +199,30 @@ class MarketTrading:
             workflow.logger.error(f"Failed to enter trade: {enter_err}")
             raise enter_err
 
-        algo_id = await workflow.execute_activity_method(
-                    TradingMarketActivities.place_market_stop_order,
-                    trade_params,
-                    start_to_close_timeout=timedelta(seconds=5),
-                    retry_policy=retry_policy,
+        try:
+            algo_id = await workflow.execute_activity_method(
+                        TradingMarketActivities.place_stop_market_order,
+                        trade_params,
+                        start_to_close_timeout=timedelta(seconds=5),
+                        retry_policy=retry_policy,
+                    )
+        except ActivityError as stop_err:
+            workflow.logger.error(f"Failed to place stop order: {stop_err}")
+            try:
+                order_id = await workflow.execute_activity_method(
+                        TradingMarketActivities.exit_market,
+                        trade_params,
+                        start_to_close_timeout=timedelta(seconds=5),
+                        retry_policy=retry_policy,
+                    )
+                workflow.logger.info(
+                    f"Emergency exit was successful. Confirmation ID: {order_id}"
                 )
+            except ActivityError as exit_err:
+                workflow.logger.error(f"Failed to place exit market order: {exit_err}")
+                raise exit_err from stop_err
+            
+            raise stop_err
 
         await workflow.start_child_workflow(
             ManageMarketPositionWorkflow.run,
@@ -214,7 +246,7 @@ class ManageMarketPositionWorkflow:
         take_profit_order_id = None
         finished = False
 
-        retry_policy = RetryPolicy(maximum_attempts=3)
+        retry_policy = RetryPolicy(maximum_attempts=10)
 
         while not finished:
             result = await workflow.execute_activity_method(
