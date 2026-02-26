@@ -71,8 +71,7 @@ async def main() -> None:
             testnet_activities.demo_cancel_limit,
             testnet_activities.demo_place_stop_order,
             testnet_activities.demo_manage_position_iteration
-        ],
-        debug_mode=True
+        ]
     )
 
     await worker.run()
