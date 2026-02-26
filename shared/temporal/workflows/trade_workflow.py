@@ -96,7 +96,7 @@ class LimitTrading:
             algo_id = await workflow.execute_activity_method(
                         TradingLimitActivities.place_stop_order,
                         trade_params,
-                        start_to_close_timeout=timedelta(seconds=5),
+                        start_to_close_timeout=timedelta(seconds=5.0),
                         retry_policy=retry_policy,
                     )
         except ActivityError as stop_err:
@@ -105,7 +105,7 @@ class LimitTrading:
                 order_id = await workflow.execute_activity_method(
                         TradingLimitActivities.exit_market_for_limit_position,
                         trade_params,
-                        start_to_close_timeout=timedelta(seconds=5),
+                        start_to_close_timeout=timedelta(seconds=5.0),
                         retry_policy=retry_policy,
                     )
                 workflow.logger.info(
@@ -206,7 +206,7 @@ class MarketTrading:
             algo_id = await workflow.execute_activity_method(
                         TradingMarketActivities.place_stop_market_order,
                         trade_params,
-                        start_to_close_timeout=timedelta(seconds=5),
+                        start_to_close_timeout=timedelta(seconds=5.0),
                         retry_policy=retry_policy,
                     )
         except ActivityError as stop_err:
@@ -215,7 +215,7 @@ class MarketTrading:
                 order_id = await workflow.execute_activity_method(
                         TradingMarketActivities.exit_market,
                         trade_params,
-                        start_to_close_timeout=timedelta(seconds=5),
+                        start_to_close_timeout=timedelta(seconds=5.0),
                         retry_policy=retry_policy,
                     )
                 workflow.logger.info(
