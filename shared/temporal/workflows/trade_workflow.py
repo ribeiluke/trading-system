@@ -92,7 +92,7 @@ class LimitTrading:
     
         try:
             if position:
-                trade_params.quantity = float(position.position_amt)
+                trade_params.quantity = abs(float(position.position_amt))
             algo_id = await workflow.execute_activity_method(
                         TradingLimitActivities.place_stop_order,
                         trade_params,
