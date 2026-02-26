@@ -107,11 +107,9 @@ class TradingLimitActivities:
             if status == "CANCELED":
                 # its possible that partial order was filled and the rest canceled
                 position = await asyncio.to_thread(
-                    client.rest_api.position_information_v3,
+                    self.trading_service.get_position,
+                    client=client,
                     symbol=order_params.trade_params.symbol
-                )
-                position = (
-                    position[0] if len(position.data()) > 0 else None
                 )
             return status, position
         except Exception as e:
