@@ -62,7 +62,6 @@ class LimitService(TradingService):
                 logging.warning(
                     "Precision is over the maximum defined for this asset. Retrying..."
                 )
-                time.sleep(2)
                 try:
                     return self.place_limit_order(
                         symbol,

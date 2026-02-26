@@ -51,7 +51,6 @@ class MarketService(TradingService):
                 logging.warning(
                     "Precision is over the maximum defined for this asset. Retrying..."
                 )
-                time.sleep(2)
                 try:
                     return self.enter_market_order(
                         symbol,

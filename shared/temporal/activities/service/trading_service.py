@@ -143,7 +143,6 @@ class TradingService:
                 logging.warning(
                     "Precision is over the maximum defined for this asset. Retrying..."
                 )
-                time.sleep(2)
                 try:
                     return self.exit_market_order(
                         symbol,
@@ -170,7 +169,6 @@ class TradingService:
             except Exception as e:
                 num_retries -= 1
                 logging.warning(f"Failed to cancel order {order_id}, retries left: {num_retries}")
-                time.sleep(2)
     
     def cancel_all_orders_for_symbol(
         self, symbol: str, client: DerivativesTradingUsdsFutures
