@@ -262,7 +262,7 @@ class TradingService:
             self, client: DerivativesTradingUsdsFutures, symbol: str
         ) -> Optional[PositionInformationV3Response]:
         open_positions = client.rest_api.position_information_v3(symbol=symbol).data()
-        return open_positions[0] if len(open_positions) > 0 else None
+        return open_positions[0] if open_positions else None
     
     def get_take_profit_price(
         self, entry_price: float, atr_value: float, atr_take_profit_mul: float, side: str
