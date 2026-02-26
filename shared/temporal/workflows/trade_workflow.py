@@ -25,6 +25,7 @@ class LimitTrading:
             maximum_attempts=10,
             maximum_interval=timedelta(seconds=2.0)
         )
+        position = None
 
         # Set leverage
         try:
@@ -72,7 +73,7 @@ class LimitTrading:
 
         if not is_filled:
             try:
-                status = await workflow.execute_activity_method(
+                status, position = await workflow.execute_activity_method(
                     TradingLimitActivities.cancel_limit,
                     OrderParams(
                     trade_params=trade_params, order_id=order_id
@@ -83,13 +84,15 @@ class LimitTrading:
                 workflow.logger.info(
                     f"Cancel successful. Confirmation status: {status}"
                 )
-                if status == "CANCELED":
+                if not position:
                     return f"Order {order_id} was not filled and has been cancelled. Status: {status}"
             except ActivityError as cancel_error:
                 workflow.logger.error(f"Cancel failed: {cancel_error}")
                 raise cancel_error
     
         try:
+            if position:
+                trade_params.quantity = float(position.position_amt)
             algo_id = await workflow.execute_activity_method(
                         TradingLimitActivities.place_stop_order,
                         trade_params,

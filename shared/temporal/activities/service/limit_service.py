@@ -88,7 +88,6 @@ class LimitService(TradingService):
                 symbol=symbol,
                 order_id=order_id
             )
-
             status = order.data().get("status", "")
             if status == "FILLED":
                 return True

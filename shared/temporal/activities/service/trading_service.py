@@ -1,26 +1,18 @@
 import logging
 import time
-import traceback
-from datetime import datetime, timezone, timedelta
 from typing import Optional
+
 from binance_sdk_derivatives_trading_usds_futures.derivatives_trading_usds_futures import (
     DerivativesTradingUsdsFutures
 )
 from binance_sdk_derivatives_trading_usds_futures.rest_api.models import (
+    ModifyOrderSideEnum,
+    ModifyOrderPriceMatchEnum,
     NewAlgoOrderNewOrderRespTypeEnum,
     NewOrderSideEnum,
-    NewOrderPriceMatchEnum,
     NewOrderTimeInForceEnum,
-    OrderBookResponse,
     PositionInformationV3Response
 )
-from fastapi import params
-
-from shared.database.mongo import log_to_db
-from shared.models.trade_plan import ManagePositionIterationResult
-from shared.util.atr import get_latest_atr
-from shared.util.stop import get_current_atr_trailing_stop
-from shared.util.telegram import send_telegram_message
 
 class TradingService:
     def set_leverage(
@@ -70,6 +62,23 @@ class TradingService:
         except Exception as e:
             logging.error(f"select_price_from_order_book() error: {e}")
             raise
+
+    def modify_order(
+            self, symbol: str, side:str, quantity: float, order_id: int, client: DerivativesTradingUsdsFutures
+    ) -> int:
+        try:
+            logging.info(f"Modifying order with ID: {order_id}")
+            order = client.rest_api.modify_order(
+                symbol=symbol,
+                side=ModifyOrderSideEnum[side].value,
+                quantity=quantity,
+                price_match=ModifyOrderPriceMatchEnum["QUEUE"].value,
+                order_id=order_id
+            )
+            return order.data().order_id
+        except Exception as e:
+            logging.exception("modify_order failed")
+            raise
     
     def cancel_order(
         self, symbol: str, order_id: int, client: DerivativesTradingUsdsFutures
@@ -82,18 +91,27 @@ class TradingService:
             )
             logging.info(f"Cancel order response: {response}")
             return response.data().status
-        except Exception as e:
-            logging.error(f"cancel_order() error: {e}")
-            msg = str(e)
+        except Exception as cancel_err:
+            logging.error(f"cancel_order() error: {cancel_err}")
+            msg = str(cancel_err)
 
             # ✅ retry timestamp problems
             if "-2011" in msg:
-                message = "Order already filled during cancellation attempt."
                 logging.warning(
-                    "Order already filled during cancellation attempt."
+                    "Order is no longer open."
                 )
-                return message
-            raise e
+                try:
+                    order = client.rest_api.query_order(
+                        symbol=symbol,
+                        order_id=order_id
+                    )
+                    return order.data().get("status", "")
+                except Exception as query_err:
+                    logging.error(
+                        f"query_order error on cancel_order() func: {query_err}"
+                    )
+                    raise query_err from cancel_err
+            raise cancel_err
     
     def exit_market_order(
         self,

@@ -1,12 +1,15 @@
 import asyncio
+from typing import Optional
 
 from temporalio import activity
+from binance_sdk_derivatives_trading_usds_futures.rest_api.models import (
+    PositionInformationV3Response
+)
 
 from .service.limit_service import LimitService
 from shared.config.auth import get_futures_client
 from shared.models.trade_plan import (
     ManagePositionIterationParams,
-    ManagePositionParams,
     ManagePositionIterationResult,
     OrderParams,
     TradeParams
@@ -87,8 +90,11 @@ class TradingLimitActivities:
             raise
     
     @activity.defn
-    async def cancel_limit(self, order_params: OrderParams) -> str:
+    async def cancel_limit(
+        self, order_params: OrderParams
+    ) -> tuple[str, Optional[PositionInformationV3Response]]:
         try:
+            position = None
             client = get_futures_client(
                 order_params.trade_params.api_key, order_params.trade_params.api_secret
             )
@@ -98,7 +104,16 @@ class TradingLimitActivities:
                 order_id=order_params.order_id,
                 client=client
             )
-            return status
+            if status == "CANCELED":
+                # its possible that partial order was filled and the rest canceled
+                position = await asyncio.to_thread(
+                    client.rest_api.position_information_v3,
+                    symbol=order_params.trade_params.symbol
+                )
+                position = (
+                    position[0] if len(position.data()) > 0 else None
+                )
+            return status, position
         except Exception as e:
             activity.logger.exception(
                 f"cancel_order() error: {e}"
