@@ -137,13 +137,12 @@ class MarketService(TradingService):
             if self.check_take_profit_triggered(current_price, take_profit_price, side):
                 if not take_profit_triggered:
                     take_profit_size = round((position_size / 2), quantity_decimals)
-                    take_profit_order_id = self.enter_market_order(
+                    take_profit_order_id = self.exit_market_order(
                         symbol=symbol,
-                        side="SELL" if side == "BUY" else "BUY",
+                        side=side,
                         quantity=take_profit_size,
-                        client=client,
-                        is_enter=False,
-                        quantity_decimals=quantity_decimals
+                        quantity_decimals=quantity_decimals,
+                        client=client
                     )
 
                     if chat_id:
@@ -157,8 +156,8 @@ class MarketService(TradingService):
                     symbol=symbol,
                     side=side,
                     quantity=position_size,
-                    client=client,
-                    quantity_decimals=quantity_decimals
+                    quantity_decimals=quantity_decimals,
+                    client=client
                 )
             else:
                 atr_value = get_latest_atr(
@@ -187,10 +186,4 @@ class MarketService(TradingService):
         except Exception as e:
             logging.critical(f"Error in manage_position_iteration: {e}")
             traceback.print_exc()
-            return ManagePositionIterationResult(
-                atr_value=atr_value,
-                take_profit_triggered=take_profit_triggered,
-                trailing_stop_price=trailing_stop_price,
-                take_profit_order_id=take_profit_order_id,
-                finished=False
-            )
+            raise
