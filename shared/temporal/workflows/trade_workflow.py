@@ -178,6 +178,24 @@ class MarketTrading:
             maximum_interval=timedelta(seconds=2.0)
         )
 
+        # check for open position
+        try:
+            position = await workflow.execute_activity_method(
+                TradingMarketActivities.check_position_market,
+                trade_params,
+                start_to_close_timeout=timedelta(seconds=5.0),
+                retry_policy=retry_policy,
+            )
+            if position:
+                return (
+                    f"Found position for {trade_params.symbol}"
+                )
+        except ActivityError as position_err:
+            workflow.logger.error(
+                f"Failed to check for position: {position_err}"
+            )
+            raise position_err
+
         # Set leverage
         try:
             trade_params.leverage = await workflow.execute_activity_method(

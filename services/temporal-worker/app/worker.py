@@ -60,6 +60,7 @@ async def main() -> None:
             activities.place_stop_order,
             activities.exit_market_for_limit_position,
             activities.manage_position_iteration,
+            market_activities.check_position_market,
             market_activities.set_market_leverage,
             market_activities.enter_market,
             market_activities.place_stop_market_order,

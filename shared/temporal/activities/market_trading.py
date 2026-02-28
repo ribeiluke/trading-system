@@ -1,6 +1,10 @@
 import asyncio
+from typing import Optional
 
 from temporalio import activity
+from binance_sdk_derivatives_trading_usds_futures.rest_api.models import (
+    PositionInformationV3Response
+)
 
 from shared.temporal.activities.service.market_service import MarketService
 from shared.config.auth import get_futures_client
@@ -16,6 +20,24 @@ from shared.util.telegram import send_telegram_message
 class TradingMarketActivities:
     def __init__(self):
         self.trading_service = MarketService()
+
+    @activity.defn
+    async def check_position_market(
+        self, trade_params: TradeParams
+    ) -> Optional[PositionInformationV3Response]:
+        try:
+            client = get_futures_client(trade_params.api_key, trade_params.api_secret)
+            position = await asyncio.to_thread(
+                self.trading_service.get_position,
+                symbol=trade_params.symbol,
+                client=client
+            )
+            return position
+        except Exception as e:
+            activity.logger.exception(
+                f"new_order() error: {e}"
+            )
+            raise
     
     @activity.defn
     async def set_market_leverage(
