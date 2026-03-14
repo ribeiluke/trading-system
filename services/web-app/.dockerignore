@@ -1,0 +1,10 @@
+node_modules
+.next
+Dockerfile
+README.md
+*.log
+*.swp
+*.swo
+dist
+coverage
+npm-debug.log

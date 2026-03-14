@@ -119,6 +119,20 @@ services:
       - TEMPORAL_SERVER=${TEMPORAL_ADDRESS}
       - PYDEVD_DISABLE_FILE_VALIDATION=1
 
+  web-app:
+    build:
+      context: ./services/web-app
+      dockerfile: Dockerfile
+    depends_on:
+      - api-gateway
+    networks:
+      - temporal-network
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api-gateway:8000
+    restart: unless-stopped
+
 networks:
   temporal-network:
     driver: bridge
